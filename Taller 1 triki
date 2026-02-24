@@ -1,1 +1,169 @@
+import copy
 
+VACIO = " "
+JUGADORES = ["X", "O"]
+
+class Nodo:
+    def __init__(self, tablero, turno, padre=None, profundidad=0):
+        self.tablero = tablero
+        self.turno = turno
+        self.padre = padre
+        self.hijos = []
+        self.profundidad = profundidad
+
+# TABLERO
+
+def imprimir_tablero(tablero, prefijo=""):
+    for fila in tablero:
+        print(prefijo + "┆ " + " │ ".join(fila) + " ┆")
+    print(prefijo + "└───────────┘")
+
+
+def hay_ganador(tablero, jugador):
+    for i in range(3):
+        if all(tablero[i][j] == jugador for j in range(3)):
+            return True
+        if all(tablero[j][i] == jugador for j in range(3)):
+            return True
+
+    if all(tablero[i][i] == jugador for i in range(3)):
+        return True
+    if all(tablero[i][2 - i] == jugador for i in range(3)):
+        return True
+
+    return False
+
+
+def tablero_lleno(tablero):
+    return all(tablero[i][j] != VACIO for i in range(3) for j in range(3))
+
+
+
+def obtener_camino(nodo):
+    camino = []
+    while nodo:
+        camino.append(nodo.tablero)
+        nodo = nodo.padre
+    return camino[::-1]
+
+
+# GENERADOR DE ÁRBOL
+
+def generar_arbol(nodo, prefijo="", resultados=None, hojas=None, stats=None):
+
+    if resultados is None:
+        resultados = {"X": 0, "O": 0, "Empate": 0}
+
+    if hojas is None:
+        hojas = []
+
+    if stats is None:
+        stats = {"min": float("inf"), "max": 0}
+
+    tablero = nodo.tablero
+    turno = nodo.turno
+
+    if hay_ganador(tablero, "X"):
+        print(prefijo + "└── GANA X")
+        resultados["X"] += 1
+        hojas.append(nodo)
+
+        stats["min"] = min(stats["min"], nodo.profundidad)
+        stats["max"] = max(stats["max"], nodo.profundidad)
+        return
+
+    if hay_ganador(tablero, "O"):
+        print(prefijo + "└── GANA O")
+        resultados["O"] += 1
+        hojas.append(nodo)
+
+        stats["min"] = min(stats["min"], nodo.profundidad)
+        stats["max"] = max(stats["max"], nodo.profundidad)
+        return
+
+    if tablero_lleno(tablero):
+        print(prefijo + "└── EMPATE")
+        resultados["Empate"] += 1
+        hojas.append(nodo)
+
+        stats["min"] = min(stats["min"], nodo.profundidad)
+        stats["max"] = max(stats["max"], nodo.profundidad)
+        return
+
+    # Generar movimientos
+
+    movimientos = [
+        (i, j) for i in range(3) for j in range(3) if tablero[i][j] == VACIO
+    ]
+
+    for idx, (i, j) in enumerate(movimientos):
+        es_ultimo = idx == len(movimientos) - 1
+        rama = "└──" if es_ultimo else "├──"
+
+        print(prefijo + f"{rama} {turno} en ({i},{j})")
+
+        nuevo_tablero = copy.deepcopy(tablero)
+        nuevo_tablero[i][j] = turno
+
+        hijo = Nodo(
+            nuevo_tablero,
+            "O" if turno == "X" else "X",
+            nodo,
+            nodo.profundidad + 1
+        )
+
+        nodo.hijos.append(hijo)
+
+        nuevo_prefijo = prefijo + ("    " if es_ultimo else "│   ")
+
+        imprimir_tablero(nuevo_tablero, nuevo_prefijo)
+
+        generar_arbol(hijo, nuevo_prefijo, resultados, hojas, stats)
+
+    return resultados, hojas, stats
+
+
+def ingresar_tablero():
+    print("\nIngresa el tablero fila por fila (X, O o . para vacío)")
+    tablero = []
+
+    for i in range(3):
+        while True:
+            fila = input(f"Fila {i}: ").upper()
+            if len(fila) == 3 and all(c in "XO." for c in fila):
+                tablero.append([c if c != "." else VACIO for c in fila])
+                break
+            print("Entrada inválida")
+
+    return tablero
+
+# PROGRAMA PRINCIPAL
+
+if __name__ == "__main__":
+
+    tablero_inicial = ingresar_tablero()
+
+    turno_inicial = input("Turno actual (X/O): ").upper()
+
+    raiz = Nodo(tablero_inicial, turno_inicial)
+
+    print("\nÁRBOL COMPLETO\n")
+    imprimir_tablero(raiz.tablero)
+
+    resultados, hojas, stats = generar_arbol(raiz)
+
+    print("\nRESUMEN FINAL")
+    for k, v in resultados.items():
+        print(f"{k}: {v}")
+
+    print("\nPROFUNDIDAD")
+    print("Minima:", stats["min"])
+    print("Maxima:", stats["max"])
+
+    # Mostrar un recorrido ejemplo
+    print("\nEJEMPLO DE RECORRIDO HASTA HOJA:\n")
+    camino = obtener_camino(hojas[0])
+
+    for paso, tablero in enumerate(camino):
+        print("Paso", paso)
+        imprimir_tablero(tablero)
